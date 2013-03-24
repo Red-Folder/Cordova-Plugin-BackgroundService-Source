@@ -8,7 +8,7 @@ Normally it will be easier for you to use the compiled versions, found at https:
 
 I use the code within an Android Library.  Copy the src & aidl folders into the root folder of your project.
 
-Note that if you attempt to use this code directly within an application, you will be need to refer additional files provided in https://github.com/Red-Folder/Cordova-Plugin-BackgroundService
+Note that if you attempt to use this code directly within an application, you will be need to refer to additional files provided in https://github.com/Red-Folder/Cordova-Plugin-BackgroundService
 
 ## Cordova Versions ##
 
@@ -35,7 +35,7 @@ Please let me know your thoughts and comments.
 
 The MIT License
 
-Copyright (c) 2012 Red Folder Consultancy Ltd
+Copyright (c) 2013 Red Folder Consultancy Ltd
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
