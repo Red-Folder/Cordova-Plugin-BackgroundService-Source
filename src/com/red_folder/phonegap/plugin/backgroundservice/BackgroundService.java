@@ -34,6 +34,7 @@ public abstract class BackgroundService extends Service {
 	 * Fields 
 	 ************************************************************************************************
 	 */
+	private Boolean mServiceInitialised = false;
 	private Timer mTimer;
 	
 	private final Object mResultLock = new Object();
@@ -52,13 +53,13 @@ public abstract class BackgroundService extends Service {
 		onPause();
 	}
 	
-	private Boolean getEnabled() {
+	public Boolean getEnabled() {
 		SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);  
 
 		return sharedPrefs.getBoolean(this.getClass().getName() + ".Enabled", false);
 	}
 
-	private void setEnabled(Boolean enabled) {
+	public void setEnabled(Boolean enabled) {
 		SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);  
 
 		SharedPreferences.Editor editor = sharedPrefs.edit();
@@ -66,14 +67,14 @@ public abstract class BackgroundService extends Service {
         editor.commit(); // Very important
 	}
 	
-	private int getMilliseconds() {
+	public int getMilliseconds() {
 		SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);  
 
 		// Should default to a minute
 		return sharedPrefs.getInt(this.getClass().getName() + ".Milliseconds", 60000 );	
 	}
 
-	private void setMilliseconds(int milliseconds) {
+	public void setMilliseconds(int milliseconds) {
 		SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);  
 
 		SharedPreferences.Editor editor = sharedPrefs.edit();
@@ -81,7 +82,30 @@ public abstract class BackgroundService extends Service {
         editor.commit(); // Very important
 	}
 
+	protected JSONObject getLatestResult() {
+		synchronized (mResultLock) {
+			return mLatestResult;
+		}
+	}
+	
+	protected void setLatestResult(JSONObject value) {
+		synchronized (mResultLock) {
+			this.mLatestResult = value;
+		}
+	}
 
+	public void restartTimer() {
+        
+        // Stop the timertask and restart for the new interval to take effect
+        if (this.mUpdateTask != null) {
+        	this.mUpdateTask.cancel();
+        	this.mUpdateTask = null;
+
+			this.mUpdateTask = getTimerTask(); 			
+			this.mTimer.schedule(this.mUpdateTask, getMilliseconds(), getMilliseconds());
+        }
+	}
+	
 	/*
 	 ************************************************************************************************
 	 * Overriden Methods 
@@ -99,23 +123,20 @@ public abstract class BackgroundService extends Service {
 		super.onCreate();     
 		Log.i(TAG, "Service creating");
 
-		// Initialise the LatestResult object
-		JSONObject tmp = initialiseLatestResult();
-
-		synchronized (mResultLock) {
-			Log.i(TAG, "Syncing result");
-			mLatestResult = tmp;
-		};
-
-		
+		// Duplicating the call to initialiseService across onCreate and onStart
+		// Done this to ensure that my initialisation code is called.
+		// Found that the onStart was not called if Android was re-starting the service if killed
+		initialiseService();
 	}
 
 	@Override
 	public void onStart(Intent intent, int startId) {
 		Log.i(TAG, "Service started");       
 
-		if (getEnabled())
-			this.setupTimerTask();
+		// Duplicating the call to initialiseService across onCreate and onStart
+		// Done this to ensure that my initialisation code is called.
+		// Found that the onStart was not called if Android was re-starting the service if killed
+		initialiseService();
 	}
 	
 	@Override  
@@ -246,6 +267,25 @@ public abstract class BackgroundService extends Service {
 
 	};
 
+	private void initialiseService() {
+		
+		if (!this.mServiceInitialised) {
+			Log.i(TAG, "Initialising the service");
+
+			// Initialise the LatestResult object
+			JSONObject tmp = initialiseLatestResult();
+
+			Log.i(TAG, "Syncing result");
+			this.setLatestResult(tmp);
+		
+			if (getEnabled())
+				this.setupTimerTask();
+			
+			this.mServiceInitialised = true;
+		}
+
+	}
+
 	private void setupTimerTask () {
 		// Only create a timer if the timer is null
 		if (this.mTimer == null) {
@@ -254,57 +294,7 @@ public abstract class BackgroundService extends Service {
 		
 		// Only create the updateTask if is null
 		if (this.mUpdateTask == null) {
-			this.mUpdateTask	= new TimerTask() {
-
-				@Override    
-				public void run() {       
-					Log.i(TAG, "Timer task starting work");
-
-					Log.d(TAG, "Is the service paused?");
-					Boolean paused = false;
-					if (mPausedUntil != null) {
-						Log.d(TAG, "Service is paused until " + (new SimpleDateFormat("dd/MM/yyyy hh:mm:ss")).format(mPausedUntil));
-						Date current = new Date();
-						Log.d(TAG, "Current is " + (new SimpleDateFormat("dd/MM/yyyy hh:mm:ss")).format(current));
-						if (mPausedUntil.after(current)) {
-							Log.d(TAG, "Service should be paused");
-							paused = true;					// Still paused
-						} else {
-							Log.d(TAG, "Service should not be paused");
-							mPausedUntil = null;				// Paused time has past so we can clear the pause
-							onPauseComplete();
-						}
-					}
-
-					if (paused) {
-						Log.d(TAG, "Service is paused");
-					} else {
-						Log.d(TAG, "Service is not paused");
-						JSONObject tmp = null;
-						tmp = doWork();
-
-						synchronized (mResultLock) {
-							Log.i(TAG, "Syncing result");
-							mLatestResult = tmp;
-						};
-
-						// Now call the listeners
-						Log.i(TAG, "Sending to all listeners");
-						for (int i = 0; i < mListeners.size(); i++)
-						{
-							try {
-								mListeners.get(i).handleUpdate();
-								Log.i(TAG, "Sent listener - " + i);
-							} catch (RemoteException e) {
-								Log.i(TAG, "Failed to send to listener - " + i + " - " + e.getMessage());
-							}
-						}
-					}
-
-					Log.i(TAG, "Timer task completing work");
-				}   
-			};
-			
+			this.mUpdateTask = getTimerTask(); 			
 			int milliseconds = getMilliseconds();
 			this.mTimer.schedule(this.mUpdateTask, 1000L, milliseconds);
 		}
@@ -328,6 +318,59 @@ public abstract class BackgroundService extends Service {
 		}
 		
 		onTimerDisabled();
+	}
+	
+	private TimerTask getTimerTask() {
+		return new TimerTask() {
+
+			@Override    
+			public void run() {       
+				Log.i(TAG, "Timer task starting work");
+
+				Log.d(TAG, "Is the service paused?");
+				Boolean paused = false;
+				if (mPausedUntil != null) {
+					Log.d(TAG, "Service is paused until " + (new SimpleDateFormat("dd/MM/yyyy hh:mm:ss")).format(mPausedUntil));
+					Date current = new Date();
+					Log.d(TAG, "Current is " + (new SimpleDateFormat("dd/MM/yyyy hh:mm:ss")).format(current));
+					if (mPausedUntil.after(current)) {
+						Log.d(TAG, "Service should be paused");
+						paused = true;					// Still paused
+					} else {
+						Log.d(TAG, "Service should not be paused");
+						mPausedUntil = null;				// Paused time has past so we can clear the pause
+						onPauseComplete();
+					}
+				}
+
+				if (paused) {
+					Log.d(TAG, "Service is paused");
+				} else {
+					Log.d(TAG, "Service is not paused");
+					JSONObject tmp = null;
+					tmp = doWork();
+
+					Log.i(TAG, "Syncing result");
+					setLatestResult(tmp);
+					
+
+					// Now call the listeners
+					Log.i(TAG, "Sending to all listeners");
+					for (int i = 0; i < mListeners.size(); i++)
+					{
+						try {
+							mListeners.get(i).handleUpdate();
+							Log.i(TAG, "Sent listener - " + i);
+						} catch (RemoteException e) {
+							Log.i(TAG, "Failed to send to listener - " + i + " - " + e.getMessage());
+						}
+					}
+				}
+
+				Log.i(TAG, "Timer task completing work");
+			}   
+		};
+
 	}
 	
 	/*
