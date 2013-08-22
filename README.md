@@ -16,6 +16,13 @@ Cordova versions provide different plugin architecture.  To provide for this I h
 
 You will only want to include one of these in your project (delete the other versions) and then rename it to BackgroundServicePlugin.java.
 
+## Depreciated Versions ##
+
+Over time I will no longer maintain older versions.  These will be listed here.  The code is still be available, but may not compile or build without work.
+
+* BackgroundServicePlugin.v1.8.1.java - For use with Cordova 1.8.1 - Depreciated 21st August 2013
+* BackgroundServicePlugin.v2.0.0.java - For use with Cordova 2.0.0 - Depreciated 21st August 2013
+
 ## Further Information ##
 
 Further information on the plugin can be found at:
