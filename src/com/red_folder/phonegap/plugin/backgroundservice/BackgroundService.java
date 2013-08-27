@@ -265,6 +265,11 @@ public abstract class BackgroundService extends Service {
 			}
 		}
 
+		@Override
+		public int getTimerMilliseconds() throws RemoteException {
+			return getMilliseconds();
+		}
+
 	};
 
 	private void initialiseService() {

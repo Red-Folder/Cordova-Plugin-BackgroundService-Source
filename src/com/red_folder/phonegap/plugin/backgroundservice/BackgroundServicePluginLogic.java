@@ -520,11 +520,13 @@ public class BackgroundServicePluginLogic {
 				try { result.put("TimerEnabled", isTimerEnabled()); } catch (Exception ex) {};
 				try { result.put("Configuration", getConfiguration()); } catch (Exception ex) {};
 				try { result.put("LatestResult", getLatestResult()); } catch (Exception ex) {};
+				try { result.put("TimerMilliseconds", getTimerMilliseconds()); } catch (Exception ex) {};
 			} else {
 				try { result.put("ServiceRunning", false); } catch (Exception ex) {};
 				try { result.put("TimerEnabled", null); } catch (Exception ex) {};
 				try { result.put("Configuration", null); } catch (Exception ex) {};
 				try { result.put("LatestResult", null); } catch (Exception ex) {};
+				try { result.put("TimerMilliseconds", null); } catch (Exception ex) {};
 			}
 
 			try { result.put("RegisteredForBootStart", isRegisteredForBootStart()); } catch (Exception ex) {};
@@ -596,6 +598,20 @@ public class BackgroundServicePluginLogic {
 
 			return result;
 		}
+
+		private int getTimerMilliseconds()
+		{
+			int result = -1;
+			
+			try {
+				result = mApi.getTimerMilliseconds();
+			} catch (Exception ex) {
+			}
+			
+			return result;
+		}
+
+
 	}
 
 	protected class ExecuteResult {
