@@ -175,7 +175,10 @@ public abstract class BackgroundService extends Service {
 		@Override
 		public String getLatestResult() throws RemoteException {
 			synchronized (mResultLock) {
-				return mLatestResult.toString();
+				if (mLatestResult == null)
+					return "{}";
+				else
+					return mLatestResult.toString();
 			}
 		}
 

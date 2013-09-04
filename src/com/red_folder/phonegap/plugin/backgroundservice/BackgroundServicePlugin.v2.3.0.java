@@ -48,11 +48,17 @@ public class BackgroundServicePlugin extends CordovaPlugin {
 						ExecuteResult pluginResult = mLogic.execute(action, data);
 
 						if (pluginResult.getStatus() == ExecuteStatus.OK) {
-							callback.success(pluginResult.getData());
+							if (pluginResult.getData() == null)
+								callback.success();
+							else
+								callback.success(pluginResult.getData());
 							//result = true;
 						}
 						if (pluginResult.getStatus() == ExecuteStatus.ERROR) {
-							callback.error(pluginResult.getData());
+							if (pluginResult.getData() == null)
+								callback.error("Unknown error");
+							else
+								callback.error(pluginResult.getData());
 							//result = true;
 						}
 					}

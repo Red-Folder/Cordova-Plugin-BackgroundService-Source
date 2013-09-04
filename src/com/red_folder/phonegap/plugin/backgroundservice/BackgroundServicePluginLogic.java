@@ -145,7 +145,7 @@ public class BackgroundServicePluginLogic {
 				if (result == null) {
 					Log.d(TAG, "Check if the service is running?");
 
-					if (service.isServiceRunning()) {
+					if (service != null && service.isServiceRunning()) {
 						Log.d(TAG, "Service is running?");
 						
 						if (ACTION_STOP_SERVICE.equals(action)) result = service.stopService();
@@ -212,6 +212,12 @@ public class BackgroundServicePluginLogic {
 	 ************************************************************************************************
 	 */
 	protected class ServiceDetails {
+		/*
+		 ************************************************************************************************
+		 * Static values 
+		 ************************************************************************************************
+		 */
+		public final String LOCALTAG = BackgroundServicePluginLogic.ServiceDetails.class.getSimpleName();
 		
 		/*
 		 ************************************************************************************************
@@ -265,24 +271,24 @@ public class BackgroundServicePluginLogic {
 
 		public ExecuteResult startService()
 		{
-			Log.d(TAG, "Starting startService");
+			Log.d(LOCALTAG, "Starting startService");
 			ExecuteResult result = null;
 			
 			try {
-				Log.d(TAG, "Attempting to bind to Service");
+				Log.d(LOCALTAG, "Attempting to bind to Service");
 				if (this.bindToService()) {
-					Log.d(TAG, "Bind worked");
+					Log.d(LOCALTAG, "Bind worked");
 					result = new ExecuteResult(ExecuteStatus.OK, createJSONResult(true, ERROR_NONE_CODE, ERROR_NONE_MSG));
 				} else {
-					Log.d(TAG, "Bind Failed");
+					Log.d(LOCALTAG, "Bind Failed");
 					result = new ExecuteResult(ExecuteStatus.ERROR, createJSONResult(false, ERROR_UNABLE_TO_BIND_TO_BACKGROUND_SERVICE_CODE, ERROR_UNABLE_TO_BIND_TO_BACKGROUND_SERVICE_MSG));
 				}
 			} catch (Exception ex) {
-				Log.d(TAG, "Exception occurred - " + ex.getMessage());
+				Log.d(LOCALTAG, "startService failed", ex);
 				result = new ExecuteResult(ExecuteStatus.ERROR, createJSONResult(false, ERROR_EXCEPTION_CODE, ex.getMessage()));
 			}
 			
-			Log.d(TAG, "Finished startService");
+			Log.d(LOCALTAG, "Finished startService");
 			return result;
 		}
 		
@@ -306,7 +312,7 @@ public class BackgroundServicePluginLogic {
 				}
 				result = new ExecuteResult(ExecuteStatus.OK, createJSONResult(true, ERROR_NONE_CODE, ERROR_NONE_MSG));
 			} catch (Exception ex) {
-				Log.d("ServiceDetails", "Exception occurred");
+				Log.d(LOCALTAG, "stopService failed", ex);
 				result = new ExecuteResult(ExecuteStatus.ERROR, createJSONResult(false, ERROR_EXCEPTION_CODE, ex.getMessage()));
 			}
 			
@@ -322,6 +328,7 @@ public class BackgroundServicePluginLogic {
 				mApi.enableTimer(milliseconds);
 				result = new ExecuteResult(ExecuteStatus.OK, createJSONResult(true, ERROR_NONE_CODE, ERROR_NONE_MSG));
 			} catch (RemoteException ex) {
+				Log.d(LOCALTAG, "enableTimer failed", ex);
 				result = new ExecuteResult(ExecuteStatus.ERROR, createJSONResult(false, ERROR_EXCEPTION_CODE, ex.getMessage()));
 			}
 
@@ -336,6 +343,7 @@ public class BackgroundServicePluginLogic {
 				mApi.disableTimer();
 				result = new ExecuteResult(ExecuteStatus.OK, createJSONResult(true, ERROR_NONE_CODE, ERROR_NONE_MSG));
 			} catch (RemoteException ex) {
+				Log.d(LOCALTAG, "disableTimer failed", ex);
 				result = new ExecuteResult(ExecuteStatus.ERROR, createJSONResult(false, ERROR_EXCEPTION_CODE, ex.getMessage()));
 			}
 
@@ -351,6 +359,7 @@ public class BackgroundServicePluginLogic {
 
 				result = new ExecuteResult(ExecuteStatus.OK, createJSONResult(true, ERROR_NONE_CODE, ERROR_NONE_MSG));
 			} catch (Exception ex) {
+				Log.d(LOCALTAG, "registerForBootStart failed", ex);
 				result = new ExecuteResult(ExecuteStatus.ERROR, createJSONResult(false, ERROR_EXCEPTION_CODE, ex.getMessage()));
 			}
 
@@ -366,6 +375,7 @@ public class BackgroundServicePluginLogic {
 
 				result = new ExecuteResult(ExecuteStatus.OK, createJSONResult(true, ERROR_NONE_CODE, ERROR_NONE_MSG));
 			} catch (Exception ex) {
+				Log.d(LOCALTAG, "deregisterForBootStart failed", ex);
 				result = new ExecuteResult(ExecuteStatus.ERROR, createJSONResult(false, ERROR_EXCEPTION_CODE, ex.getMessage()));
 			}
 
@@ -384,12 +394,14 @@ public class BackgroundServicePluginLogic {
 						mApi.setConfiguration(obj.toString());
 						result = new ExecuteResult(ExecuteStatus.OK, createJSONResult(true, ERROR_NONE_CODE, ERROR_NONE_MSG));
 					} catch (JSONException e) {
+						Log.d(LOCALTAG, "Processing config JSON from background service failed", e);
 						result = new ExecuteResult(ExecuteStatus.ERROR, createJSONResult(false, ERROR_EXCEPTION_CODE, e.getMessage()));
 					}
 				} else {
 					result = new ExecuteResult(ExecuteStatus.INVALID_ACTION, createJSONResult(false, ERROR_SERVICE_NOT_RUNNING_CODE, ERROR_SERVICE_NOT_RUNNING_MSG));
 				}
 			} catch (RemoteException ex) {
+				Log.d(LOCALTAG, "setConfiguration failed", ex);
 				result = new ExecuteResult(ExecuteStatus.ERROR, createJSONResult(false, ERROR_EXCEPTION_CODE, ex.getMessage()));
 			}
 			
@@ -417,12 +429,13 @@ public class BackgroundServicePluginLogic {
 				mApi.removeListener(serviceListener);
 				Log.d("ServiceDetails", "Removing ServiceConnection");
 				this.mContext.unbindService(serviceConnection);
-			} catch (Throwable t) {
+			} catch (Exception ex) {
 				// catch any issues, typical for destroy routines
 				// even if we failed to destroy something, we need to continue destroying
-				Log.d("ServiceDetails", "Error Occurred - " + t.getMessage());
+				Log.d(LOCALTAG, "close failed", ex);
+				Log.d(LOCALTAG, "Ignoring exception - will continue");
 			}
-			Log.d("ServiceDetails", "start of isServiceRunning");
+			Log.d("ServiceDetails", "Close finished");
 		}
 		
 		/*
@@ -433,28 +446,33 @@ public class BackgroundServicePluginLogic {
 		private boolean bindToService() {
 			boolean result = false;
 			
-			Log.d(TAG, "Starting bindToService");
+			Log.d(LOCALTAG, "Starting bindToService");
 			
-			this.mService = new Intent(this.mServiceName);
+			try {
+				this.mService = new Intent(this.mServiceName);
 
-			Log.d(TAG, "Attempting to start service");
-			this.mContext.startService(this.mService);
+				Log.d(LOCALTAG, "Attempting to start service");
+				this.mContext.startService(this.mService);
 
-			Log.d(TAG, "Attempting to bind to service");
-			if (this.mContext.bindService(this.mService, serviceConnection, 0)) {
-				Log.d(TAG, "Waiting for service connected lock");
-				synchronized(mServiceConnectedLock) {
-					while (mServiceConnected==null) {
-						try {
-							mServiceConnectedLock.wait();
-						} catch (InterruptedException e) {
+				Log.d(LOCALTAG, "Attempting to bind to service");
+				if (this.mContext.bindService(this.mService, serviceConnection, 0)) {
+					Log.d(LOCALTAG, "Waiting for service connected lock");
+					synchronized(mServiceConnectedLock) {
+						while (mServiceConnected==null) {
+							try {
+								mServiceConnectedLock.wait();
+							} catch (InterruptedException e) {
+								Log.d(LOCALTAG, "Interrupt occurred while waiting for connection", e);
+							}
 						}
+						result = this.mServiceConnected;
 					}
-					result = this.mServiceConnected;
 				}
+			} catch (Exception ex) {
+				Log.d(LOCALTAG, "bindToService failed", ex);
 			}
 
-			Log.d(TAG, "Finished bindToService");
+			Log.d(LOCALTAG, "Finished bindToService");
 
 			return result;
 		}
@@ -467,6 +485,7 @@ public class BackgroundServicePluginLogic {
 				try {
 					mApi.addListener(serviceListener);
 				} catch (RemoteException e) {
+					Log.d(LOCALTAG, "addListener failed", e);
 				}
 				
 				synchronized(mServiceConnectedLock) {
@@ -513,23 +532,24 @@ public class BackgroundServicePluginLogic {
 				result.put("ErrorCode", errorCode);
 				result.put("ErrorMessage", errorMessage);
 			} catch (JSONException e) {
+				Log.d(LOCALTAG, "Adding basic info to JSONObject failed", e);
 			}
 
-			if (this.isServiceRunning()) {
-				try { result.put("ServiceRunning", true); } catch (Exception ex) {};
-				try { result.put("TimerEnabled", isTimerEnabled()); } catch (Exception ex) {};
-				try { result.put("Configuration", getConfiguration()); } catch (Exception ex) {};
-				try { result.put("LatestResult", getLatestResult()); } catch (Exception ex) {};
-				try { result.put("TimerMilliseconds", getTimerMilliseconds()); } catch (Exception ex) {};
+			if (this.mServiceConnected != null && this.mServiceConnected && this.isServiceRunning()) {
+				try { result.put("ServiceRunning", true); } catch (Exception ex) {Log.d(LOCALTAG, "Adding ServiceRunning to JSONObject failed", ex);};
+				try { result.put("TimerEnabled", isTimerEnabled()); } catch (Exception ex) {Log.d(LOCALTAG, "Adding TimerEnabled to JSONObject failed", ex);};
+				try { result.put("Configuration", getConfiguration()); } catch (Exception ex) {Log.d(LOCALTAG, "Adding Configuration to JSONObject failed", ex);};
+				try { result.put("LatestResult", getLatestResult()); } catch (Exception ex) {Log.d(LOCALTAG, "Adding LatestResult to JSONObject failed", ex);};
+				try { result.put("TimerMilliseconds", getTimerMilliseconds()); } catch (Exception ex) {Log.d(LOCALTAG, "Adding TimerMilliseconds to JSONObject failed", ex);};
 			} else {
-				try { result.put("ServiceRunning", false); } catch (Exception ex) {};
-				try { result.put("TimerEnabled", null); } catch (Exception ex) {};
-				try { result.put("Configuration", null); } catch (Exception ex) {};
-				try { result.put("LatestResult", null); } catch (Exception ex) {};
-				try { result.put("TimerMilliseconds", null); } catch (Exception ex) {};
+				try { result.put("ServiceRunning", false); } catch (Exception ex) {Log.d(LOCALTAG, "Adding ServiceRunning to JSONObject failed", ex);};
+				try { result.put("TimerEnabled", null); } catch (Exception ex) {Log.d(LOCALTAG, "Adding TimerEnabled to JSONObject failed", ex);};
+				try { result.put("Configuration", null); } catch (Exception ex) {Log.d(LOCALTAG, "Adding Configuration to JSONObject failed", ex);};
+				try { result.put("LatestResult", null); } catch (Exception ex) {Log.d(LOCALTAG, "Adding LatestResult to JSONObject failed", ex);};
+				try { result.put("TimerMilliseconds", null); } catch (Exception ex) {Log.d(LOCALTAG, "Adding TimerMilliseconds to JSONObject failed", ex);};
 			}
 
-			try { result.put("RegisteredForBootStart", isRegisteredForBootStart()); } catch (Exception ex) {};
+			try { result.put("RegisteredForBootStart", isRegisteredForBootStart()); } catch (Exception ex) {Log.d(LOCALTAG, "Adding RegisteredForBootStart to JSONObject failed", ex);};
 				
 			return result;
 		}
@@ -538,13 +558,17 @@ public class BackgroundServicePluginLogic {
 		{
 			boolean result = false;
 			
-			// Return Plugin with ServiceRunning true/ false
-		    ActivityManager manager = (ActivityManager)this.mContext.getSystemService(Context.ACTIVITY_SERVICE); 
-		    for (RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) { 
-		        if (this.mServiceName.equals(service.service.getClassName())) { 
-		            result = true; 
-		        } 
-		    } 
+			try {
+				// Return Plugin with ServiceRunning true/ false
+				ActivityManager manager = (ActivityManager)this.mContext.getSystemService(Context.ACTIVITY_SERVICE); 
+				for (RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) { 
+					if (this.mServiceName.equals(service.service.getClassName())) { 
+						result = true; 
+					} 
+				} 
+			} catch (Exception ex) {
+				Log.d(LOCALTAG, "isServiceRunning failed", ex);
+			}
 
 		    return result;
 		}
@@ -556,6 +580,7 @@ public class BackgroundServicePluginLogic {
 			try {
 				result = mApi.isTimerEnabled();
 			} catch (Exception ex) {
+				Log.d(LOCALTAG, "isTimerEnabled failed", ex);
 			}
 			
 			return result;
@@ -568,6 +593,7 @@ public class BackgroundServicePluginLogic {
 			try {
 				result = PropertyHelper.isBootService(this.mContext, this.mServiceName);
 			} catch (Exception ex) {
+				Log.d(LOCALTAG, "isRegisteredForBootStart failed", ex);
 			}
 
 			return result;
@@ -581,6 +607,7 @@ public class BackgroundServicePluginLogic {
 				String data = mApi.getConfiguration();
 				result = new JSONObject(data);
 			} catch (Exception ex) {
+				Log.d(LOCALTAG, "getConfiguration failed", ex);
 			}
 			
 			return result;
@@ -594,6 +621,7 @@ public class BackgroundServicePluginLogic {
 				String data = mApi.getLatestResult();
 				result = new JSONObject(data);
 			} catch (Exception ex) {
+				Log.d(LOCALTAG, "getLatestResult failed", ex);
 			}
 
 			return result;
@@ -606,6 +634,7 @@ public class BackgroundServicePluginLogic {
 			try {
 				result = mApi.getTimerMilliseconds();
 			} catch (Exception ex) {
+				Log.d(LOCALTAG, "getTimerMilliseconds failed", ex);
 			}
 			
 			return result;
