@@ -44,6 +44,8 @@ public class BackgroundServicePluginLogic {
 	
 	public static final String ACTION_GET_STATUS = "getStatus";
 
+	public static final String ACTION_RUN_ONCE = "runOnce";
+
 	
 	public static final int ERROR_NONE_CODE = 0;
 	public static final String ERROR_NONE_MSG = "";
@@ -96,7 +98,9 @@ public class BackgroundServicePluginLogic {
 		if(ACTION_DEREGISTER_FOR_BOOTSTART.equals(action)) result = true;
 		
 		if(ACTION_GET_STATUS.equals(action)) result = true;
-		
+
+		if(ACTION_RUN_ONCE.equals(action)) result = true;
+
 		return result;
 	}
 	
@@ -154,6 +158,8 @@ public class BackgroundServicePluginLogic {
 						if (ACTION_DISABLE_TIMER.equals(action)) result = service.disableTimer();
 
 						if (ACTION_SET_CONFIGURATION.equals(action)) result = service.setConfiguration(data);
+
+						if (ACTION_RUN_ONCE.equals(action)) result = service.runOnce();
 
 					} else {
 						result = new ExecuteResult(ExecuteStatus.INVALID_ACTION);
@@ -417,6 +423,25 @@ public class BackgroundServicePluginLogic {
 			return result;
 		}
 		
+		public ExecuteResult runOnce()
+		{
+			ExecuteResult result = null;
+			
+			try {
+				if (this.isServiceRunning()) {
+					mApi.run();
+					result = new ExecuteResult(ExecuteStatus.OK, createJSONResult(true, ERROR_NONE_CODE, ERROR_NONE_MSG));
+				} else {
+					result = new ExecuteResult(ExecuteStatus.INVALID_ACTION, createJSONResult(false, ERROR_SERVICE_NOT_RUNNING_CODE, ERROR_SERVICE_NOT_RUNNING_MSG));
+				}
+			} catch (RemoteException ex) {
+				Log.d(LOCALTAG, "runOnce failed", ex);
+				result = new ExecuteResult(ExecuteStatus.ERROR, createJSONResult(false, ERROR_EXCEPTION_CODE, ex.getMessage()));
+			}
+			
+			return result;
+		}
+
 
 		/*
 		 * Background Service specific methods

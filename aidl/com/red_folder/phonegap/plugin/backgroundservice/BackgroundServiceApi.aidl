@@ -20,4 +20,6 @@ interface BackgroundServiceApi {
 	void setConfiguration(String configuration);
 	
 	int getTimerMilliseconds();
+	
+	void run();
 } 

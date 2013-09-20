@@ -162,6 +162,17 @@ public abstract class BackgroundService extends Service {
 
 	/*
 	 ************************************************************************************************
+	 * Protected methods 
+	 ************************************************************************************************
+	 */
+	protected void runOnce() {
+		// Runs the doWork once
+		// Sets the last result & updates the listeners
+		doWorkWrapper();
+	}
+
+	/*
+	 ************************************************************************************************
 	 * Private methods 
 	 ************************************************************************************************
 	 */
@@ -273,6 +284,10 @@ public abstract class BackgroundService extends Service {
 			return getMilliseconds();
 		}
 
+		@Override
+		public void run() throws RemoteException {
+			runOnce();
+		}
 	};
 
 	private void initialiseService() {
@@ -355,30 +370,43 @@ public abstract class BackgroundService extends Service {
 					Log.d(TAG, "Service is paused");
 				} else {
 					Log.d(TAG, "Service is not paused");
-					JSONObject tmp = null;
-					tmp = doWork();
-
-					Log.i(TAG, "Syncing result");
-					setLatestResult(tmp);
 					
-
-					// Now call the listeners
-					Log.i(TAG, "Sending to all listeners");
-					for (int i = 0; i < mListeners.size(); i++)
-					{
-						try {
-							mListeners.get(i).handleUpdate();
-							Log.i(TAG, "Sent listener - " + i);
-						} catch (RemoteException e) {
-							Log.i(TAG, "Failed to send to listener - " + i + " - " + e.getMessage());
-						}
-					}
+					// Runs the doWork 
+					// Sets the last result & updates the listeners
+					doWorkWrapper();
 				}
 
 				Log.i(TAG, "Timer task completing work");
 			}   
 		};
 
+	}
+	
+	// Seperated out to allow the doWork to be called from timer and adhoc (via run method)
+	private void doWorkWrapper() {
+		JSONObject tmp = null;
+		
+		try {
+			tmp = doWork();
+		} catch (Exception ex) {
+			Log.i(TAG, "Exception occurred during doWork()", ex);
+		}
+
+		Log.i(TAG, "Syncing result");
+		setLatestResult(tmp);
+		
+		// Now call the listeners
+		Log.i(TAG, "Sending to all listeners");
+		for (int i = 0; i < mListeners.size(); i++)
+		{
+			try {
+				mListeners.get(i).handleUpdate();
+				Log.i(TAG, "Sent listener - " + i);
+			} catch (RemoteException e) {
+				Log.i(TAG, "Failed to send to listener - " + i + " - " + e.getMessage());
+			}
+		}
+		
 	}
 	
 	/*
