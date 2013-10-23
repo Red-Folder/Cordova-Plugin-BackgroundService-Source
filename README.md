@@ -42,7 +42,7 @@ Please let me know your thoughts and comments.
 
 If you find the Background Service Plugin useful then spread the love.
 
-All the work I do on the Plugin is done in my spare time - time I would otherwise be spending taking my wife out for a nice meal or helping my lad find Vinyl Records (he's currently very much into The Smiths, Fleetwood Mac and Kate Bush).
+All the work I do on the Plugin is done in my spare time - time I would otherwise be spending taking my wife out for a nice meal or helping my lad find vinyl records (he's currently very much into The Smiths, Fleetwood Mac and Kate Bush).
 
 The Plugin is free and will always remain free.  I will continue to develop, maintain and distribute the Plugin under the MIT License.
 
