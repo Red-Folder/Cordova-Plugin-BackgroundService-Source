@@ -46,19 +46,40 @@ public class BackgroundServicePluginLogic {
 
 	public static final String ACTION_RUN_ONCE = "runOnce";
 
+	public static final String ACTION_REGISTER_FOR_UPDATES = "registerForUpdates";
+	public static final String ACTION_DEREGISTER_FOR_UPDATES = "deregisterForUpdates";
+	
 	
 	public static final int ERROR_NONE_CODE = 0;
 	public static final String ERROR_NONE_MSG = "";
+	
 	public static final int ERROR_PLUGIN_ACTION_NOT_SUPPORTED_CODE = -1;
 	public static final String ERROR_PLUGIN_ACTION_NOT_SUPPORTED_MSG = "Passed action not supported by Plugin";
+	
 	public static final int ERROR_INIT_NOT_YET_CALLED_CODE = -2;
 	public static final String ERROR_INIT_NOT_YET_CALLED_MSG = "Please call init prior any other action";
+	
 	public static final int ERROR_SERVICE_NOT_RUNNING_CODE = -3;
 	public static final String ERROR_SERVICE_NOT_RUNNING_MSG = "Sevice not currently running";
+	
 	public static final int ERROR_UNABLE_TO_BIND_TO_BACKGROUND_SERVICE_CODE = -4;
 	public static final String ERROR_UNABLE_TO_BIND_TO_BACKGROUND_SERVICE_MSG ="Plugin unable to bind to background service";
+	
 	public static final int ERROR_UNABLE_TO_RETRIEVE_LAST_RESULT_CODE = -5;
 	public static final String ERROR_UNABLE_TO_RETRIEVE_LAST_RESULT_MSG = "Unable to retrieve latest result (reason unknown)";
+	
+	public static final int ERROR_LISTENER_ALREADY_REGISTERED_CODE = -6;
+	public static final String ERROR_LISTENER_ALREADY_REGISTERED_MSG = "Listener already registered";
+	
+	public static final int ERROR_LISTENER_NOT_REGISTERED_CODE = -7;
+	public static final String ERROR_LISTENER_NOT_REGISTERED_MSG = "Listener not registered";
+
+	public static final int ERROR_UNABLE_TO_CLOSED_LISTENER_CODE = -8;
+	public static final String ERROR_UNABLE_TO_CLOSED_LISTENER_MSG = "Unable to close listener";
+	
+	public static final int ERROR_ACTION_NOT_SUPPORTED__IN_PLUGIN_VERSION_CODE = -9;
+	public static final String ERROR_ACTION_NOT_SUPPORTED__IN_PLUGIN_VERSION_MSG = "Action is not supported in this version of the plugin";
+
 	public static final int ERROR_EXCEPTION_CODE = -99;
 	
 	/*
@@ -74,15 +95,32 @@ public class BackgroundServicePluginLogic {
 	 * Constructors 
 	 ************************************************************************************************
 	 */
+	// Part fix for https://github.com/Red-Folder/Cordova-Plugin-BackgroundService/issues/19
+	//public BackgroundServicePluginLogic() {
+	//}
+
 	public BackgroundServicePluginLogic(Context pContext) {
 		this.mContext = pContext;
 	}
-	
+
 	/*
 	 ************************************************************************************************
 	 * Public Methods 
 	 ************************************************************************************************
 	 */
+	
+	// Part fix for https://github.com/Red-Folder/Cordova-Plugin-BackgroundService/issues/19
+	//public void initialize(Context pContext) {
+	//	this.mContext = pContext;
+	//}
+	
+	//public boolean isInitialized() {
+	//	if (this.mContext == null)
+	//		return false;
+	//	else
+	//		return true;
+	//}
+	
 	public boolean isActionValid(String action) {
 		boolean result = false;
 
@@ -100,11 +138,18 @@ public class BackgroundServicePluginLogic {
 		if(ACTION_GET_STATUS.equals(action)) result = true;
 
 		if(ACTION_RUN_ONCE.equals(action)) result = true;
+		
+		if(ACTION_REGISTER_FOR_UPDATES.equals(action)) result = true;
+		if(ACTION_DEREGISTER_FOR_UPDATES.equals(action)) result = true;
 
 		return result;
 	}
-	
+
 	public ExecuteResult execute(String action, JSONArray data) {
+		return execute(action, data, null, null);
+	}
+
+	public ExecuteResult execute(String action, JSONArray data, IUpdateListener listener, Object[] listenerExtras) {
 		ExecuteResult result = null;
 		
 		Log.d(TAG, "Start of Execute");
@@ -145,6 +190,8 @@ public class BackgroundServicePluginLogic {
 				if (ACTION_REGISTER_FOR_BOOTSTART.equals(action)) result = service.registerForBootStart();
 				if (ACTION_DEREGISTER_FOR_BOOTSTART.equals(action)) result = service.deregisterForBootStart();
 
+				if (ACTION_REGISTER_FOR_UPDATES.equals(action)) result = service.registerForUpdates(listener, listenerExtras);
+				if (ACTION_DEREGISTER_FOR_UPDATES.equals(action)) result = service.deregisterForUpdates();
 
 				if (result == null) {
 					Log.d(TAG, "Check if the service is running?");
@@ -244,6 +291,9 @@ public class BackgroundServicePluginLogic {
 		private Object mServiceConnectedLock = new Object();
 		private Boolean mServiceConnected = null;
 
+		private IUpdateListener mListener = null;
+		private Object[] mListenerExtras = null;
+				
 		/*
 		 ************************************************************************************************
 		 * Constructors 
@@ -442,6 +492,54 @@ public class BackgroundServicePluginLogic {
 			return result;
 		}
 
+		public ExecuteResult registerForUpdates(IUpdateListener listener, Object[] listenerExtras)
+		{
+			ExecuteResult result = null;
+			try {
+				
+				// Check for if the listener is null
+				// If it is then it will be because the Plguin version doesn't support the method
+				if (listener == null) {
+					result = new ExecuteResult(ExecuteStatus.INVALID_ACTION, createJSONResult(false, ERROR_ACTION_NOT_SUPPORTED__IN_PLUGIN_VERSION_CODE, ERROR_ACTION_NOT_SUPPORTED__IN_PLUGIN_VERSION_MSG));
+				} else {
+					
+					// If a listener already exists, then we fist need to deregister the original
+					// Ignore any failures (likely due to the listener not being available anymore)
+					if (this.isRegisteredForUpdates()) 
+						this.deregisterListener();
+				
+					this.mListener = listener;
+					this.mListenerExtras = listenerExtras;
+
+					result = new ExecuteResult(ExecuteStatus.OK, createJSONResult(true, ERROR_NONE_CODE, ERROR_NONE_MSG), false);
+				}
+			} catch (Exception ex) {
+				Log.d(LOCALTAG, "regsiterForUpdates failed", ex);
+				result = new ExecuteResult(ExecuteStatus.ERROR, createJSONResult(false, ERROR_EXCEPTION_CODE, ex.getMessage()));
+			}
+			
+			return result;
+		}
+		
+		public ExecuteResult deregisterForUpdates()
+		{
+			ExecuteResult result = null;
+			try {
+				if (this.isRegisteredForUpdates())
+					if (this.deregisterListener())
+						result = new ExecuteResult(ExecuteStatus.OK, createJSONResult(true, ERROR_NONE_CODE, ERROR_NONE_MSG));
+					else
+						result = new ExecuteResult(ExecuteStatus.ERROR, createJSONResult(false, ERROR_UNABLE_TO_CLOSED_LISTENER_CODE, ERROR_UNABLE_TO_CLOSED_LISTENER_MSG));
+				else
+					result = new ExecuteResult(ExecuteStatus.INVALID_ACTION, createJSONResult(false, ERROR_LISTENER_NOT_REGISTERED_CODE, ERROR_LISTENER_NOT_REGISTERED_MSG));
+				
+			} catch (Exception ex) {
+				Log.d(LOCALTAG, "deregsiterForUpdates failed", ex);
+				result = new ExecuteResult(ExecuteStatus.ERROR, createJSONResult(false, ERROR_EXCEPTION_CODE, ex.getMessage()));
+			}
+			
+			return result;
+		}
 
 		/*
 		 * Background Service specific methods
@@ -450,6 +548,9 @@ public class BackgroundServicePluginLogic {
 		{
 			Log.d("ServiceDetails", "Close called");
 			try {
+				// Remove the lister to this publisher
+				this.deregisterListener();
+				
 				Log.d("ServiceDetails", "Removing ServiceListener");
 				mApi.removeListener(serviceListener);
 				Log.d("ServiceDetails", "Removing ServiceConnection");
@@ -462,7 +563,30 @@ public class BackgroundServicePluginLogic {
 			}
 			Log.d("ServiceDetails", "Close finished");
 		}
-		
+
+		private boolean deregisterListener() {
+			boolean result = false;
+
+			if (this.isRegisteredForUpdates()) {
+				Log.d("ServiceDetails", "Listener deregistering");
+				try {
+					Log.d("ServiceDetails", "Listener closing");
+					this.mListener.closeListener(new ExecuteResult(ExecuteStatus.OK, createJSONResult(true, ERROR_NONE_CODE, ERROR_NONE_MSG)), this.mListenerExtras);
+					Log.d("ServiceDetails", "Listener closed");
+				} catch (Exception ex) {
+					Log.d("ServiceDetails", "Error occurred while closing the listener", ex);
+				}
+				
+				this.mListener = null;
+				this.mListenerExtras = null;
+				Log.d("ServiceDetails", "Listener deregistered");
+				
+				result = true;
+			}
+			
+			return result;
+		}
+
 		/*
 		 ************************************************************************************************
 		 * Private Methods 
@@ -545,7 +669,23 @@ public class BackgroundServicePluginLogic {
 
 		private void handleLatestResult() {
 			Log.d("ServiceDetails", "Latest results received");
-			Log.d("ServiceDetails", "No action performed");
+			
+			if (this.isRegisteredForUpdates()) {
+				Log.d("ServiceDetails", "Calling listener");
+				
+				ExecuteResult result = new ExecuteResult(ExecuteStatus.OK, createJSONResult(true, ERROR_NONE_CODE, ERROR_NONE_MSG), false);
+				try {
+					this.mListener.handleUpdate(result, this.mListenerExtras);
+					Log.d("ServiceDetails", "Listener finished");
+				} catch (Exception ex) {
+					Log.d("ServiceDetails", "Listener failed", ex);
+					Log.d("ServiceDetails", "Disabling listener");
+					this.mListener = null;
+					this.mListenerExtras = null;
+				}
+			} else {
+				Log.d("ServiceDetails", "No action performed");
+			}
 		}
 
 		private JSONObject createJSONResult(Boolean success, int errorCode, String errorMessage) {
@@ -575,6 +715,7 @@ public class BackgroundServicePluginLogic {
 			}
 
 			try { result.put("RegisteredForBootStart", isRegisteredForBootStart()); } catch (Exception ex) {Log.d(LOCALTAG, "Adding RegisteredForBootStart to JSONObject failed", ex);};
+			try { result.put("RegisteredForUpdates", isRegisteredForUpdates()); } catch (Exception ex) {Log.d(LOCALTAG, "Adding RegisteredForUpdates to JSONObject failed", ex);};
 				
 			return result;
 		}
@@ -624,6 +765,14 @@ public class BackgroundServicePluginLogic {
 			return result;
 		}
 
+		private Boolean isRegisteredForUpdates()
+		{
+			if (this.mListener == null)
+				return false;
+			else
+				return true;
+		}
+
 		private JSONObject getConfiguration()
 		{
 			JSONObject result = null;
@@ -665,7 +814,6 @@ public class BackgroundServicePluginLogic {
 			return result;
 		}
 
-
 	}
 
 	protected class ExecuteResult {
@@ -677,6 +825,7 @@ public class BackgroundServicePluginLogic {
 		 */
 		private ExecuteStatus mStatus;
 		private JSONObject mData;
+		private boolean mFinished = true;
 
 		public ExecuteStatus getStatus() {
 			return this.mStatus;
@@ -693,8 +842,15 @@ public class BackgroundServicePluginLogic {
 		public void setData(JSONObject pData) {
 			this.mData = pData;
 		}
+		
+		public boolean isFinished() {
+			return this.mFinished;
+		}
 
-
+		public void setFinished(boolean pFinished) {
+			this.mFinished = pFinished;
+		}
+		
 		/*
 		 ************************************************************************************************
 		 * Constructors 
@@ -708,7 +864,18 @@ public class BackgroundServicePluginLogic {
 			this.mStatus = pStatus;
 			this.mData = pData;
 		}
-		
+
+		public ExecuteResult(ExecuteStatus pStatus, JSONObject pData, boolean pFinished) {
+			this.mStatus = pStatus;
+			this.mData = pData;
+			this.mFinished = pFinished;
+		}
+
+	}
+
+	public interface IUpdateListener {
+		public void handleUpdate(ExecuteResult logicResult, Object[] listenerExtras);
+		public void closeListener(ExecuteResult logicResult, Object[] listenerExtras);
 	}
 	
 	/*
