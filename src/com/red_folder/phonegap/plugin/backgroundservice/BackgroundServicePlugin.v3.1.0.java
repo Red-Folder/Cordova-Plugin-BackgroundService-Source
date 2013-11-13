@@ -100,7 +100,7 @@ public class BackgroundServicePlugin extends CordovaPlugin implements Background
 
 		if (this.mLogic != null) {
 			this.mLogic.onDestroy();
-			//this.mLogic = null;
+			this.mLogic = null;
 		}
 	}
 
