@@ -1,3 +1,16 @@
+# IMPORTANT NOTE
+To support Plugman format plugins, I have created a new repository.  This is in line with Cordova project direction.  At the current time I will continue to support this version (via this repository) - however this will not be indefinite so I would advice you to migrate to the Plugman format as soon as is practical.
+
+* Core logic is now Plugman compatible and found here -> https://github.com/Red-Folder/bgs-core 
+* A sample plugin is also available in Plugman format and available here -> https://github.com/Red-Folder/bgs-sample 
+* Both plugins are also available from http://plugins.cordova.io/ 
+* Fully re-documented which can be found here -> https://github.com/Red-Folder/bgs-core/wiki 
+* Issues should now me raised here -> https://github.com/Red-Folder/bgs-core/issues 
+
+In future all updates to the plugin will be tweeted via @FolderRed
+
+
+
 # Source code for the Background Service Plugin for Cordova #
 
 This is the source code for my BackgroundService for use with Cordova.
